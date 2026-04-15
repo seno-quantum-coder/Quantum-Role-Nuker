@@ -4,7 +4,7 @@ let Activity, ActivityLog, LeaveLog;
 
 async function initialize() {
   try {
-    await mongoose.connect(MONGODB_URI);
+    await mongoose.connect(process.env.MONGODB_URI);
 
     const activitySchema = new mongoose.Schema({
       guildId: String,
