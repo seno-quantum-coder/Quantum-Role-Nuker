@@ -65,7 +65,6 @@ client.on("interactionCreate", async (interaction) => {
     await db.setLeave(guildId, userId, days);
     await interaction.reply({
       content: `✅ Leave recorded! You have **${days} day(s)** of approved leave. These won't count toward your inactivity timer.`,
-      ephemeral: true,
     });
     console.log(`🏖️ ${interaction.user.tag} took ${days} day(s) of leave.`);
   }
@@ -79,7 +78,6 @@ client.on("interactionCreate", async (interaction) => {
     if (!data) {
       return interaction.reply({
         content: "❓ No activity data found for this user.",
-        ephemeral: true,
       });
     }
 
@@ -125,14 +123,12 @@ client.on("interactionCreate", async (interaction) => {
     ) {
       return interaction.reply({
         content: "❌ Only admins can reset activity.",
-        ephemeral: true,
       });
     }
     const user = interaction.options.getUser("user");
     await db.recordActivity(interaction.guild.id, user.id);
     await interaction.reply({
       content: `✅ Activity reset for <@${user.id}>.`,
-      ephemeral: true,
     });
   }
 
@@ -144,7 +140,6 @@ client.on("interactionCreate", async (interaction) => {
     ) {
       return interaction.reply({
         content: "❌ Only admins can grant leave.",
-        ephemeral: true,
       });
     }
     const user = interaction.options.getUser("user");
@@ -152,7 +147,6 @@ client.on("interactionCreate", async (interaction) => {
     await db.setLeave(interaction.guild.id, user.id, days);
     await interaction.reply({
       content: `✅ Granted **${days}** day(s) of leave to <@${user.id}>.`,
-      ephemeral: true,
     });
   }
 });
