@@ -1,5 +1,5 @@
 module.exports = {
-  TOKEN: DISCORD_TOKEN,
+  TOKEN: process.env.DISCORD_TOKEN,
 
   // ── Inactivity Thresholds ──────────────────────────────────────────────────
   WARN_AFTER_DAYS: 3,
