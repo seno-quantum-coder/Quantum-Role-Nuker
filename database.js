@@ -5,7 +5,10 @@ let Activity, ActivityLog, LeaveLog;
 
 async function initialize() {
   try {
-    await mongoose.connect(process.env.MONGODB_URI);
+    await mongoose.connect(process.env.MONGODB_URI, {
+      maxPoolSize: 3,
+      serverSelectionTimeoutMS: 5000,
+    });
 
     const activitySchema = new mongoose.Schema({
       guildId: String,
