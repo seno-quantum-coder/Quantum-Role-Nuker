@@ -17,6 +17,7 @@ async function initialize() {
       warningSent: { type: Boolean, default: false },
       leaveBalance: { type: Number, default: 0 },
       leaveStart: Number,
+      internSince: { type: Number, default: null }, // timestamp when intern role was assigned
     });
     activitySchema.index({ guildId: 1, userId: 1 }, { unique: true });
     Activity = mongoose.model("Activity", activitySchema);
@@ -231,6 +232,51 @@ function getDateStringOffset(days) {
   return toDateString(d);
 }
 
+// ─── Set intern start date (only sets once, never overwrites) ────────────────
+async function setInternSince(guildId, userId) {
+  try {
+    const member = await getMemberData(guildId, userId);
+    if (member && member.internSince) return; // already set, don't overwrite
+    await Activity.findOneAndUpdate(
+      { guildId, userId },
+      { $setOnInsert: {}, internSince: Date.now() },
+      { upsert: true },
+    );
+  } catch (error) {
+    console.error("Error setting internSince:", error);
+  }
+}
+
+// ─── Get active leave (if member is currently on approved leave) ──────────────
+async function getActiveLeave(guildId, userId) {
+  try {
+    const todayStr = getTodayString();
+    const leave = await LeaveLog.findOne({
+      guildId,
+      userId,
+      startDate: { $lte: todayStr },
+      endDate: { $gte: todayStr },
+    }).sort({ endDate: -1 });
+    return leave || null;
+  } catch (error) {
+    console.error("Error getting active leave:", error);
+    return null;
+  }
+}
+
+// ─── Force-set intern start date (admin override, always overwrites) ─────────
+async function forceSetInternSince(guildId, userId, timestamp) {
+  try {
+    await Activity.findOneAndUpdate(
+      { guildId, userId },
+      { internSince: timestamp },
+      { upsert: true },
+    );
+  } catch (error) {
+    console.error("Error force-setting internSince:", error);
+  }
+}
+
 module.exports = {
   initialize,
   recordActivity,
@@ -241,4 +287,7 @@ module.exports = {
   resetWarning,
   getEffectiveInactiveDays,
   getConsecutiveActiveDays,
+  setInternSince,
+  forceSetInternSince,
+  getActiveLeave,
 };

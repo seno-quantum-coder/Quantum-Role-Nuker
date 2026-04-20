@@ -1,7 +1,6 @@
 require("dotenv").config();
 const { REST, Routes, SlashCommandBuilder } = require("discord.js");
 const config = require("./config");
-// ── IMPORTANT: Fill these in ──────────────────────────────────────────────────
 
 const commands = [
   new SlashCommandBuilder()
@@ -46,6 +45,19 @@ const commands = [
         .setRequired(true)
         .setMinValue(1),
     ),
+
+  new SlashCommandBuilder()
+    .setName("setintern")
+    .setDescription("[Admin] Record when a member became an intern.")
+    .addUserOption((opt) =>
+      opt.setName("user").setDescription("Target member").setRequired(true),
+    )
+    .addStringOption((opt) =>
+      opt
+        .setName("date")
+        .setDescription("Intern start date (YYYY-MM-DD). Defaults to today.")
+        .setRequired(false),
+    ),
 ].map((cmd) => cmd.toJSON());
 
 const rest = new REST({ version: "10" }).setToken(config.TOKEN);
@@ -58,9 +70,7 @@ const rest = new REST({ version: "10" }).setToken(config.TOKEN);
         process.env.CLIENT_ID,
         process.env.GUILD_ID,
       ),
-      {
-        body: commands,
-      },
+      { body: commands },
     );
     console.log("✅ Slash commands registered successfully!");
   } catch (err) {
