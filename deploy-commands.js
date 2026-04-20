@@ -1,7 +1,9 @@
 require("dotenv").config();
 const { REST, Routes, SlashCommandBuilder } = require("discord.js");
 const config = require("./config");
-
+// REST → Used to send API requests to Discord
+// Routes → Provides API endpoints (like where to register commands)
+// SlashCommandBuilder → Helps you define slash commands cleanly
 const commands = [
   new SlashCommandBuilder()
     .setName("leave")
