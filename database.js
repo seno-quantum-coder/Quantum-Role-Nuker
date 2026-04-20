@@ -15,6 +15,7 @@ async function initialize() {
       userId: String,
       lastActivity: { type: Number, default: 0 },
       warningSent: { type: Boolean, default: false },
+      warnedAt: { type: Number, default: null }, // timestamp when warning was sent
       leaveBalance: { type: Number, default: 0 },
       leaveStart: Number,
       internSince: { type: Number, default: null }, // timestamp when intern role was assigned
@@ -115,11 +116,13 @@ async function setLeave(guildId, userId, days) {
 // ─── Mark warning as sent ─────────────────────────────────────────────────────
 async function setWarningSent(guildId, userId, value) {
   try {
-    await Activity.findOneAndUpdate(
-      { guildId, userId },
-      { lastActivity: Date.now(), warningSent: value },
-      { upsert: true },
-    );
+    const update = { warningSent: value };
+    if (value)
+      update.warnedAt = Date.now(); // record exactly when warning fired
+    else update.warnedAt = null; // clear on reset
+    await Activity.findOneAndUpdate({ guildId, userId }, update, {
+      upsert: true,
+    });
   } catch (error) {
     console.error("Error setting warning sent:", error);
   }
@@ -145,9 +148,18 @@ async function resetWarning(guildId, userId) {
 async function getEffectiveInactiveDays(guildId, userId) {
   try {
     const member = await getMemberData(guildId, userId);
-    if (!member || !member.lastActivity) return 0;
+    if (!member) return 0;
 
-    const lastActivity = new Date(member.lastActivity);
+    // Use lastActivity if the member has ever sent a message.
+    // If lastActivity is 0/missing (never messaged), fall back to internSince
+    // so they are counted as inactive from the day they became an intern.
+    // If neither is set we cannot determine inactivity — return 0.
+    const activityTimestamp = member.lastActivity || member.internSince || 0;
+    if (!activityTimestamp) return 0;
+
+    // lastActivity = 0 means "never messaged" — we're measuring from internSince.
+    // In that case we still want to count every day since then as inactive.
+    const lastActivity = new Date(activityTimestamp);
     const now = new Date();
 
     // Total elapsed days since last activity
@@ -181,6 +193,56 @@ async function getEffectiveInactiveDays(guildId, userId) {
     return Math.max(0, totalDays - coveredDays);
   } catch (error) {
     console.error("Error getting effective inactive days:", error);
+    return 0;
+  }
+}
+
+// ─── Get effective inactive days from a given timestamp ──────────────────────
+// Same logic as getEffectiveInactiveDays but accepts the reference timestamp
+// directly — so callers can pass the real last-message time from Discord
+// without going through lastActivity in the DB at all.
+async function getEffectiveInactiveDaysFromTimestamp(
+  guildId,
+  userId,
+  referenceTimestamp,
+) {
+  if (!referenceTimestamp) return 0;
+  try {
+    const lastActivity = new Date(referenceTimestamp);
+    const now = new Date();
+
+    const totalDays = Math.floor((now - lastActivity) / (1000 * 60 * 60 * 24));
+    if (totalDays <= 0) return 0;
+
+    const lastActivityStr = toDateString(lastActivity);
+    const todayStr = getTodayString();
+
+    const leaveDays = await LeaveLog.find({
+      guildId,
+      userId,
+      endDate: { $gte: lastActivityStr },
+      startDate: { $lte: todayStr },
+    });
+
+    let coveredDays = 0;
+    for (const leave of leaveDays) {
+      const leaveStart = new Date(
+        Math.max(new Date(leave.startDate), lastActivity),
+      );
+      const leaveEnd = new Date(Math.min(new Date(leave.endDate), now));
+      if (leaveEnd > leaveStart) {
+        coveredDays += Math.floor(
+          (leaveEnd - leaveStart) / (1000 * 60 * 60 * 24),
+        );
+      }
+    }
+
+    return Math.max(0, totalDays - coveredDays);
+  } catch (error) {
+    console.error(
+      "Error getting effective inactive days from timestamp:",
+      error,
+    );
     return 0;
   }
 }
@@ -233,13 +295,14 @@ function getDateStringOffset(days) {
 }
 
 // ─── Set intern start date (only sets once, never overwrites) ────────────────
+// FIXED: check internSince > 0 explicitly — 0 is stored as falsy default
 async function setInternSince(guildId, userId) {
   try {
     const member = await getMemberData(guildId, userId);
-    if (member && member.internSince) return; // already set, don't overwrite
+    if (member && member.internSince > 0) return; // already set, don't overwrite
     await Activity.findOneAndUpdate(
       { guildId, userId },
-      { $setOnInsert: {}, internSince: Date.now() },
+      { internSince: Date.now() },
       { upsert: true },
     );
   } catch (error) {
@@ -261,6 +324,19 @@ async function getActiveLeave(guildId, userId) {
   } catch (error) {
     console.error("Error getting active leave:", error);
     return null;
+  }
+}
+
+// ─── Force-set lastActivity to a specific timestamp (used by /syncactivity) ──
+async function forceSetLastActivity(guildId, userId, timestamp) {
+  try {
+    await Activity.findOneAndUpdate(
+      { guildId, userId },
+      { lastActivity: timestamp, warningSent: false },
+      { upsert: true },
+    );
+  } catch (error) {
+    console.error("Error force-setting lastActivity:", error);
   }
 }
 
@@ -289,5 +365,7 @@ module.exports = {
   getConsecutiveActiveDays,
   setInternSince,
   forceSetInternSince,
+  forceSetLastActivity,
+  getEffectiveInactiveDaysFromTimestamp,
   getActiveLeave,
 };

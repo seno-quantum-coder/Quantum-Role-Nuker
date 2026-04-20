@@ -58,6 +58,45 @@ const commands = [
         .setDescription("Intern start date (YYYY-MM-DD). Defaults to today.")
         .setRequired(false),
     ),
+
+  new SlashCommandBuilder()
+    .setName("syncactivity")
+    .setDescription(
+      "[Admin] Scan message history to backfill a member's last activity timestamp.",
+    )
+    .addUserOption((opt) =>
+      opt
+        .setName("user")
+        .setDescription("Member to sync (leave blank to sync ALL interns)")
+        .setRequired(false),
+    ),
+
+  new SlashCommandBuilder()
+    .setName("forcecheck")
+    .setDescription(
+      "[Admin] Immediately run the inactivity check (don't wait for the hourly cron).",
+    ),
+
+  new SlashCommandBuilder()
+    .setName("debuguser")
+    .setDescription(
+      "[Admin] Show raw DB data for a member to diagnose inactivity issues.",
+    )
+    .addUserOption((opt) =>
+      opt
+        .setName("user")
+        .setDescription("Member to inspect (leave blank for yourself)")
+        .setRequired(false),
+    ),
+
+  new SlashCommandBuilder()
+    .setName("testwarn")
+    .setDescription(
+      "[Admin] Force-send an inactivity warning for a specific user right now.",
+    )
+    .addUserOption((opt) =>
+      opt.setName("user").setDescription("Target member").setRequired(true),
+    ),
 ].map((cmd) => cmd.toJSON());
 
 const rest = new REST({ version: "10" }).setToken(config.TOKEN);
